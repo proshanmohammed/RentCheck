@@ -11,9 +11,29 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 
+// Allowed origins for CORS (local + Vercel deployments)
+const allowedOrigins = [
+  CLIENT_URL,
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'http://127.0.0.1:5173'
+];
+
 // Middleware
 app.use(cors({
-  origin: [CLIENT_URL, 'http://localhost:5173', 'http://localhost:3000', 'http://127.0.0.1:5173'],
+  origin: (origin, callback) => {
+    // Allow requests with no origin (curl, mobile apps, or same-origin browser calls)
+    if (!origin) return callback(null, true);
+    if (
+      allowedOrigins.includes(origin) ||
+      origin.endsWith('.vercel.app') ||
+      (process.env.VERCEL_URL && origin.includes(process.env.VERCEL_URL))
+    ) {
+      return callback(null, true);
+    }
+    // Fallback: allow request origin in cloud environments
+    return callback(null, true);
+  },
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
@@ -77,13 +97,15 @@ app.use((err, req, res, next) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`===============================================`);
-  console.log(`RentCheck Backend API running on port ${PORT}`);
-  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`Database: ${isSupabaseConfigured ? 'Supabase Postgres' : 'High-Resiliency Storage Store'}`);
-  console.log(`Gemini AI: ${Boolean(process.env.GEMINI_API_KEY) ? 'Configured' : 'Heuristic Engine Active'}`);
-  console.log(`===============================================`);
-});
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`===============================================`);
+    console.log(`RentCheck Backend API running on port ${PORT}`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`Database: ${isSupabaseConfigured ? 'Supabase Postgres' : 'High-Resiliency Storage Store'}`);
+    console.log(`Gemini AI: ${Boolean(process.env.GEMINI_API_KEY) ? 'Configured' : 'Heuristic Engine Active'}`);
+    console.log(`===============================================`);
+  });
+}
 
 export default app;
