@@ -154,3 +154,98 @@ Visit **`http://localhost:5173`** in your browser.
 4. **Publish Wizard with Duplicate Scan**: Navigate to `/listings/new` and complete the 4-step wizard. Submitting a listing with an address like `260 King Street` will trigger the AI duplicate detection engine and output the structured duplicate analysis.
 5. **Report a Listing**: On any listing page, click **"Report Ad"** to open the modal, attach evidence links, and submit for audit.
 6. **Compliance Moderation**: Switch your persona to **Elena Rostova (Moderator)** in the top navigation bar and visit `/moderation` to inspect flags, dismiss or confirm duplicate statuses, and verify ownership documents.
+
+---
+
+## 🔐 Google Authentication Setup
+
+RentCheck uses **Supabase Auth** with **Google OAuth 2.0**. Complete the following one-time setup to enable real authentication.
+
+### Step 1 — Create a Supabase project
+
+1. Go to [https://supabase.com](https://supabase.com) and sign up or log in.
+2. Click **New Project**, choose an organisation, set a project name (e.g. `rentcheck`), pick a region, set a strong database password, and click **Create new project**.
+3. Wait ~2 minutes for provisioning to complete.
+
+### Step 2 — Copy your Supabase credentials
+
+In your Supabase dashboard, go to **Settings → API**.
+
+| Setting | Where to find it |
+|---|---|
+| **Project URL** | "Project URL" box |
+| **Anon / public key** | "Project API keys" → `anon` / `public` row |
+
+> ⚠️ **Never** copy the `service_role` key into the frontend. Only the `anon` key belongs in `VITE_SUPABASE_ANON_KEY`.
+
+### Step 3 — Configure Google OAuth in Google Cloud Console
+
+1. Go to [https://console.cloud.google.com](https://console.cloud.google.com) and create (or select) a project.
+2. Enable the **Google People API**:
+   `APIs & Services → Library → Google People API → Enable`.
+3. Create OAuth 2.0 credentials:
+   `APIs & Services → Credentials → Create Credentials → OAuth client ID`.
+   - Application type: **Web application**
+   - Name: `RentCheck`
+   - Authorised JavaScript origins:
+     - `http://localhost:5173` (local dev)
+     - `https://<your-vercel-domain>.vercel.app` (production)
+   - Authorised redirect URIs:
+     - `https://<your-supabase-project>.supabase.co/auth/v1/callback`
+4. Note your **Client ID** and **Client Secret**.
+
+### Step 4 — Add Google OAuth to Supabase
+
+1. In Supabase dashboard → **Authentication → Providers → Google**.
+2. Toggle **Google** to **Enabled**.
+3. Paste your Google **Client ID** and **Client Secret**.
+4. Click **Save**.
+5. Supabase will display a **Callback URL** — this is the URL you added to Google in Step 3.
+
+### Step 5 — Add Redirect URLs to Supabase
+
+In Supabase dashboard → **Authentication → URL Configuration**:
+
+| Setting | Value |
+|---|---|
+| **Site URL** | `http://localhost:5173` (change to your production URL after deploy) |
+| **Redirect URLs** | `http://localhost:5173/auth/callback` and `https://<your-vercel-domain>.vercel.app/auth/callback` |
+
+### Step 6 — Add environment variables
+
+**Local development** — create `client/.env` (never commit this):
+
+```bash
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key
+```
+
+**Vercel production** — in your Vercel project dashboard:
+`Settings → Environment Variables`, add both variables above with your real values.
+
+### Step 7 — Run and test locally
+
+```bash
+# Start both services from repo root:
+node dev.js
+```
+
+1. Navigate to `http://localhost:5173/login`.
+2. Click **Continue with Google** — you should be redirected to Google's OAuth page.
+3. Sign in with your Google account.
+4. You should be redirected to `/auth/callback` then automatically to `/dashboard`.
+5. Your name and Google profile photo should appear in the Navbar.
+6. Click your avatar → **Sign Out** — you should be redirected to `/`.
+
+### Step 8 — Verify in production
+
+After deploying to Vercel:
+1. Update **Supabase → Authentication → URL Configuration → Site URL** to your production domain.
+2. Add `https://<your-domain>/auth/callback` to **Redirect URLs**.
+3. Add `https://<your-domain>` to the **Authorised JavaScript origins** in Google Cloud Console.
+4. Redeploy (Vercel automatically redeploys on `git push`).
+
+### Demo mode (no credentials)
+
+If `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are not set or are set to placeholder values, RentCheck operates in **demo mode**: all pages remain accessible, the persona switcher works normally, and no auth wall is shown. This is the default behaviour out of the box.
+
